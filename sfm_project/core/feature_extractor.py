@@ -29,8 +29,9 @@ class FeatureExtractor:
         descriptors_list = []
         colors_list = []
         images_list = []
+        valid_indices = []   # 成功提取的帧在原 image_names 里的索引（跳过坏帧时用于对齐）
 
-        for image_name in image_names:
+        for idx, image_name in enumerate(image_names):
             image = cv2.imread(image_name)
             if image is None:
                 print(f"Error: Cannot read {image_name}")
@@ -50,11 +51,13 @@ class FeatureExtractor:
             descriptors_list.append(descriptor)
             colors_list.append(colors)
             images_list.append(image)
+            valid_indices.append(idx)
 
         return np.array(key_points_list, dtype=object), \
             np.array(descriptors_list, dtype=object), \
             np.array(colors_list, dtype=object), \
-            images_list
+            images_list, \
+            valid_indices
 
     @staticmethod
     def _extract_colors(image, key_points):

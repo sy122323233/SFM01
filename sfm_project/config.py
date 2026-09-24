@@ -9,24 +9,18 @@ import cv2
 import numpy as np
 
 # ============ 相机内参 ============
-# 官方全分辨率（Middlebury Temple Ring，3072×2048）标定内参。
+# 官方全分辨率（Middlebury Temple Ring，3072×2048）标定内参，仅作「兜底参考」。
 #
-# 【已知问题】images2 的图片实际是 640×480，严格来说内参需按尺寸等比缩小。
-# 但实测（2026-09-09）缩小后 fx≈575、fy≈648 不再相等（fx/fy 相差约 12%），
-# 增量重建出现严重深度歧义：点云沿 z（深度）方向被拉长 10 倍以上，并出现
-# 大量相机后方（负深度）点。原因是当前流水线只做「相邻帧顺序匹配 + 增量 PnP
-# + 仅优化 3D 点的 BA」，对环形小基线数据集的深度约束本就弱，正确的小焦距
-# 内参会把这种病态暴露出来。
-# 在补齐「自标定/EXIF 内参 + 全局特征匹配 + 完整（含相机位姿）BA」之前，
-# 保留官方全分辨率内参反而能得到几何更稳定的稀疏点云。
-# TODO(A): 确定 640×480 真实内参，并增强重建鲁棒性后再启用缩放。
+# 运行时内参由 core.calibration 自动确定（AUTO_CALIBRATE=True 时）：
+#   EXIF 焦距 → 默认 f = 1.0×宽（方形像素、主点居中）。
+# 覆盖所有数据集（含 images2 及任意新图组），不再依赖官方标定值或手工缩放。
+# 若要强制用下面的官方值（例如对比实验），把 Config.AUTO_CALIBRATE 置 False 即可。
 _OFFICIAL_K = np.array([
     [2759.48, 0, 1520.69],
     [0, 2764.16, 1006.81],
     [0, 0, 1]
 ])
 _OFFICIAL_SIZE = (3072, 2048)  # (宽, 高)
-_DATASET_SIZE = (640, 480)     # (宽, 高)
 
 
 def scale_intrinsics(K, src_size, dst_size):
@@ -47,8 +41,11 @@ def scale_intrinsics(K, src_size, dst_size):
 class Config:
     """全局配置"""
 
-    # 相机内参：见文件头说明，当前保留官方全分辨率值
+    # 相机内参：见文件头说明。运行时会被 core.calibration 自动标定覆盖。
     K = _OFFICIAL_K.copy()
+
+    # 是否在流水线开始时自动确定内参 K（EXIF → 默认）。False 则用上面的 K。
+    AUTO_CALIBRATE = True
 
     # 特征提取配置
     FEATURE = {
